@@ -421,37 +421,8 @@ claude --mcp-config claude_mcp_config.json
 
 ---
 
-## Blog Post Outline (for teammate)
-
-Suggested title: **"From SQL to Graphs: Detecting Medicare Billing Anomalies with MongoDB, Neo4j, and Claude Code"**
-
-Sections:
-1. The Problem — why Medicare billing anomaly detection matters ($100B annual fraud)
-2. The Dataset — CMS Medicare data, stratified sampling, Gap_Ratio engineering
-3. MongoDB Approach — document model, aggregation pipelines, key findings
-4. Neo4j Approach — graph model, multi-hop traversal, network discovery
-5. Claude Code + MCP — how we used it, what it did better than Atlas AI
-6. Key Findings — top 5 insights across both databases
-7. Lessons Learned — MongoDB vs Neo4j vs RDBMS, AI tool comparison
-
----
-
-## Video Demo Outline (for teammate)
-
-Suggested flow (5-7 minutes):
-1. (0:00-0:30) Introduce the problem and dataset
-2. (0:30-2:00) Show MongoDB Atlas dashboard + Charts visualization
-3. (2:00-3:00) Show Claude Code running Query 1 in terminal
-4. (3:00-4:30) Show Neo4j Aura graph visualization (Blunck network)
-5. (4:30-5:30) Show Python scripts running
-6. (5:30-6:00) Summarize key findings
-
-Upload to YouTube as Unlisted and share link in report.
-
----
-
 ## Team
 
-[Add team member names here]
+[Ani Taraiya, Kavya Ayappan, Rohini Ramasheshu]
 
 SJSU MS Applied Data Intelligence — DAT 226 Spring 2026

@@ -1,0 +1,234 @@
+// ================================================================
+// DAT 226 - Medicare Provider Billing Anomaly Detection
+// Neo4j Cypher Queries
+// Dataset: CMS Medicare Physician & Other Practitioners (40K records)
+// GitHub: github.com/SaranyaVaitheeswaran/MedicareClaim
+// ================================================================
+
+
+// ================================================================
+// PART 1: ANALYTICAL QUERIES (Saranya)
+// ================================================================
+
+// Query 1 — Services with Most High-Gap Providers (1 hop)
+// Finds services where providers show Gap_Ratio above 0.95
+// Key finding: HCPCS 00731 (Anesthesia for esophagus endoscopy)
+// had 76 high-gap providers with average charge $1,970
+
+MATCH (p:Provider)-[r:PERFORMS]->(s:Service)
+WHERE r.gap_ratio > 0.95
+RETURN s.hcpcs_cd AS hcpcs_cd,
+       s.description AS description,
+       count(p) AS high_gap_providers,
+       avg(r.gap_ratio) AS avg_gap,
+       avg(r.avg_submitted_charge) AS avg_charge
+ORDER BY high_gap_providers DESC
+LIMIT 10;
+
+
+// Query 2 — Provider Types with Highest Gap Across Services (2 hops)
+// Traverses Provider -> HAS_TYPE -> ProviderType AND
+// Provider -> PERFORMS -> Service
+// Key finding: Nuclear Medicine (0.961) and Hematology-Oncology
+// (0.954) consistent with MongoDB findings
+
+MATCH (p:Provider)-[:HAS_TYPE]->(pt:ProviderType)
+MATCH (p)-[r:PERFORMS]->(s:Service)
+WHERE r.gap_ratio > 0.9
+RETURN pt.name AS provider_type,
+       count(DISTINCT p) AS providers,
+       count(DISTINCT s) AS services,
+       avg(r.gap_ratio) AS avg_gap_ratio
+ORDER BY avg_gap_ratio DESC
+LIMIT 10;
+
+
+// Query 3 — Anomalous Provider Clusters by Geography (3 hops)
+// Traverses Provider -> LOCATED_IN_CITY -> City -> IN_STATE -> State
+// Key finding: Houston TX (9 providers) and New York NY (8 providers)
+// are geographic hotspots for anomalous billing
+
+MATCH (p:Provider)-[:LOCATED_IN_CITY]->(c:City)-[:IN_STATE]->(s:State)
+WHERE p.gap_ratio > 0.95
+RETURN s.abbr AS state,
+       c.name AS city,
+       count(p) AS anomalous_providers,
+       avg(p.gap_ratio) AS avg_gap_ratio
+ORDER BY anomalous_providers DESC
+LIMIT 10;
+
+
+// Query 4 — Same Specialty + Same Location Clusters (4 hops)
+// Traverses Provider -> HAS_TYPE -> ProviderType <- HAS_TYPE <- Provider
+// + Provider -> LOCATED_IN_CITY -> City -> IN_STATE -> State
+// Key finding: CRNA clusters in Greenville SC, Detroit MI,
+// Cincinnati OH, Erie PA — systemic nationwide pattern
+
+MATCH (p1:Provider)-[:HAS_TYPE]->(pt:ProviderType)<-[:HAS_TYPE]-(p2:Provider)
+MATCH (p1)-[:LOCATED_IN_CITY]->(c:City)-[:IN_STATE]->(s:State)
+WHERE p1.gap_ratio > 0.95
+AND p2.gap_ratio > 0.95
+AND p1.npi <> p2.npi
+RETURN pt.name AS specialty,
+       c.name AS city,
+       s.abbr AS state,
+       count(DISTINCT p1) AS anomalous_providers,
+       avg(p1.gap_ratio) AS avg_gap
+ORDER BY anomalous_providers DESC
+LIMIT 10;
+
+
+// Query 5 — Provider Similarity Network (5 hops)
+// Implements SIMILAR_PROVIDER derived relationship
+// Traverses Provider -> HAS_TYPE -> ProviderType <- HAS_TYPE <- Provider
+// + Provider -> LOCATED_IN_STATE -> State <- LOCATED_IN_STATE <- Provider
+// + Provider -> PERFORMS -> Service <- PERFORMS <- Provider
+// Key finding: Blunck + Backlas (Diagnostic Radiology TX)
+// share 27 common high-gap services — network discovery
+
+MATCH (p1:Provider)-[:HAS_TYPE]->(pt:ProviderType)<-[:HAS_TYPE]-(p2:Provider)
+MATCH (p1)-[:LOCATED_IN_STATE]->(s:State)<-[:LOCATED_IN_STATE]-(p2)
+MATCH (p1)-[:PERFORMS]->(svc:Service)<-[:PERFORMS]-(p2)
+WHERE p1.npi < p2.npi
+AND p1.gap_ratio > 0.9
+AND p2.gap_ratio > 0.9
+RETURN p1.last_name AS provider1,
+       p2.last_name AS provider2,
+       pt.name AS specialty,
+       s.abbr AS state,
+       count(svc) AS shared_services,
+       avg(p1.gap_ratio + p2.gap_ratio)/2 AS avg_gap
+ORDER BY shared_services DESC
+LIMIT 10;
+
+
+// ================================================================
+// PART 2: GRAPH PATTERN QUERIES (Team)
+// ================================================================
+
+// Query 6 — Similar Provider Pairs by Shared Services (4 hops)
+// Finds provider pairs in same state and same provider type
+// sharing at least 8 common services
+// Key finding: Surfaces structural billing similarities
+// invisible in document-based analysis
+
+MATCH (p1:Provider)-[:PERFORMS]->(s:Service)<-[:PERFORMS]-(p2:Provider),
+      (p1)-[:LOCATED_IN_CITY]->(:City)-[:IN_STATE]->(st:State),
+      (p2)-[:LOCATED_IN_CITY]->(:City)-[:IN_STATE]->(st),
+      (p1)-[:HAS_TYPE]->(pt:ProviderType),
+      (p2)-[:HAS_TYPE]->(pt)
+WHERE p1.npi < p2.npi
+WITH p1, p2, pt, st, count(DISTINCT s) AS shared_services
+WHERE shared_services >= 8
+RETURN p1.npi AS provider1,
+       p2.npi AS provider2,
+       pt.name AS provider_type,
+       st.abbr AS state,
+       shared_services
+ORDER BY shared_services DESC
+LIMIT 20;
+
+
+// Query 7 — Providers with Highest Deviation from Peer Group (3 hops)
+// Compares each provider's Gap_Ratio against peer group mean
+// for same provider type and state
+// Key finding: Peer deviation is stronger anomaly signal than
+// raw Gap_Ratio — contextualizes billing behavior
+
+MATCH (p:Provider)-[:HAS_TYPE]->(pt:ProviderType),
+      (p)-[:LOCATED_IN_CITY]->(:City)-[:IN_STATE]->(st:State),
+      (p)-[r:PERFORMS]->(:Service)
+WITH pt, st, avg(r.gap_ratio) AS peer_avg_gap
+MATCH (p2:Provider)-[:HAS_TYPE]->(pt),
+      (p2)-[:LOCATED_IN_CITY]->(:City)-[:IN_STATE]->(st),
+      (p2)-[r2:PERFORMS]->(:Service)
+WITH pt, st, peer_avg_gap, p2,
+     avg(r2.gap_ratio) AS provider_avg_gap,
+     count(r2) AS edge_count
+WHERE edge_count >= 5
+RETURN p2.npi AS provider,
+       pt.name AS provider_type,
+       st.abbr AS state,
+       round(provider_avg_gap, 4) AS provider_avg_gap,
+       round(peer_avg_gap, 4) AS peer_group_avg_gap,
+       round(provider_avg_gap - peer_avg_gap, 4) AS deviation,
+       edge_count
+ORDER BY deviation DESC
+LIMIT 20;
+
+
+// Query 8 — Services Anomalous Across Multiple States (3 hops)
+// Identifies HCPCS codes with high Gap_Ratio across 5+ states
+// Distinguishes nationwide patterns from local anomalies
+// Key finding: Services anomalous in many states suggest
+// systemic Medicare pricing issues not regional behavior
+
+MATCH (p:Provider)-[r:PERFORMS]->(s:Service),
+      (p)-[:LOCATED_IN_CITY]->(:City)-[:IN_STATE]->(st:State)
+WITH s, st,
+     avg(r.gap_ratio) AS state_service_avg_gap,
+     count(*) AS occurrences
+WHERE occurrences >= 5
+WITH s,
+     count(DISTINCT st) AS affected_states,
+     avg(state_service_avg_gap) AS overall_avg_gap
+WHERE affected_states >= 5
+RETURN s.hcpcs_cd AS service_code,
+       s.description AS service_desc,
+       affected_states,
+       round(overall_avg_gap, 4) AS avg_gap_across_states
+ORDER BY avg_gap_across_states DESC, affected_states DESC
+LIMIT 15;
+
+
+// Query 9 — Dense and Anomalous Cities (2 hops)
+// Finds cities with 20+ providers AND high average Gap_Ratio
+// Combines density with anomaly signal
+// Key finding: High-density anomalous cities represent hotspots
+// where billing issues are both concentrated and widespread
+
+MATCH (p:Provider)-[:LOCATED_IN_CITY]->(c:City),
+      (p)-[r:PERFORMS]->(s:Service)
+WITH c,
+     count(*) AS provider_service_links,
+     count(DISTINCT p) AS providers,
+     count(DISTINCT s) AS services,
+     avg(r.gap_ratio) AS avg_gap_ratio
+WHERE providers >= 20
+RETURN c.name AS city,
+       provider_service_links,
+       providers,
+       services,
+       round(avg_gap_ratio, 4) AS avg_gap_ratio
+ORDER BY avg_gap_ratio DESC, provider_service_links DESC
+LIMIT 15;
+
+
+// Query 10 — Jaccard Similarity Between Provider Pairs (4 hops)
+// Calculates Jaccard = intersection / union of shared services
+// Most mathematically rigorous similarity measure in the project
+// Key finding: High Jaccard + high Gap_Ratio = strong signal
+// for coordinated billing patterns
+
+MATCH (p1:Provider)-[:HAS_TYPE]->(pt:ProviderType),
+      (p2:Provider)-[:HAS_TYPE]->(pt),
+      (p1)-[:LOCATED_IN_CITY]->(:City)-[:IN_STATE]->(st:State),
+      (p2)-[:LOCATED_IN_CITY]->(:City)-[:IN_STATE]->(st)
+WHERE p1.npi < p2.npi
+MATCH (p1)-[:PERFORMS]->(s:Service)<-[:PERFORMS]-(p2)
+WITH p1, p2, count(DISTINCT s) AS intersection
+WHERE intersection >= 5
+MATCH (p1)-[:PERFORMS]->(s1:Service)
+WITH p1, p2, intersection, count(DISTINCT s1) AS p1_count
+MATCH (p2)-[:PERFORMS]->(s2:Service)
+WITH p1, p2, intersection, p1_count, count(DISTINCT s2) AS p2_count
+WITH p1, p2, intersection,
+     (p1_count + p2_count - intersection) AS union_size
+WHERE union_size > 0
+RETURN p1.npi AS provider1,
+       p2.npi AS provider2,
+       intersection,
+       union_size,
+       round(toFloat(intersection) / union_size, 4) AS jaccard_similarity
+ORDER BY jaccard_similarity DESC, intersection DESC
+LIMIT 20;

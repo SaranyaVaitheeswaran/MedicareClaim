@@ -195,10 +195,3 @@ claude --mcp-config claude_mcp_config.json
 4. **CRNA clusters in 4 cities** nationwide — systemic pattern not isolated cases
 5. **Claude Code outperformed Atlas AI** — ran 5 parallel queries vs Atlas AI memory error on complex queries
 
----
-
-## Team
-
-[Ani Taraiya, Kavya Ayappan, Rohini Ramasheshu]
-
-SJSU MS Applied Data Intelligence — DAT 226 Spring 2026

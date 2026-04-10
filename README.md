@@ -106,7 +106,7 @@ Open Atlas UI → Browse Collections → provider_services → Aggregations
 
 ## MongoDB Queries
 
-MongoDB queries are split into two files: baseline_queries.js (descriptive analytics) and anomaly_queries.js (anomaly detection using peer Z-score and statistical methods).
+MongoDB queries are split into two files: `baseline_queries.js` (descriptive analytics) and `anomaly_queries.js` (anomaly detection using peer Z-score and statistical methods).
 
 ---
 
@@ -133,7 +133,7 @@ https://raw.githubusercontent.com/SaranyaVaitheeswaran/MedicareClaim/refs/heads/
 
 ## Neo4j Cypher Queries
 
-Cypher queries are available in 02_CypherQueries
+Cypher queries are available in `neo4j/02_CypherQueries`
 
 ---
 

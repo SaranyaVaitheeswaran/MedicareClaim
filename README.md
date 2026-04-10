@@ -2,6 +2,7 @@
 ## Using MongoDB Atlas, Neo4j Aura, and Claude Code with MCP
 
 **DAT 226 — NoSQL and Data Warehousing | SJSU | April 2026**
+**Group project: Saranya Vaitheeswaran, Ani Taraiya, Kavya Ayappan, Rohini Ramasheshu** 
 
 ---
 
@@ -132,89 +133,7 @@ https://raw.githubusercontent.com/SaranyaVaitheeswaran/MedicareClaim/refs/heads/
 
 ## Neo4j Cypher Queries
 
-### Query 1 — Services with Most High-Gap Providers (1 hop)
-```cypher
-MATCH (p:Provider)-[r:PERFORMS]->(s:Service)
-WHERE r.gap_ratio > 0.95
-RETURN s.hcpcs_cd, s.description,
-       count(p) as high_gap_providers,
-       avg(r.gap_ratio) as avg_gap,
-       avg(r.avg_submitted_charge) as avg_charge
-ORDER BY high_gap_providers DESC
-LIMIT 10
-```
-**Key finding:** HCPCS 00731 (Anesthesia for esophagus endoscopy) had 76 high-gap providers.
-
----
-
-### Query 2 — Provider Types by Gap (2 hops)
-```cypher
-MATCH (p:Provider)-[:HAS_TYPE]->(pt:ProviderType)
-MATCH (p)-[r:PERFORMS]->(s:Service)
-WHERE r.gap_ratio > 0.9
-RETURN pt.name as provider_type,
-       count(DISTINCT p) as providers,
-       count(DISTINCT s) as services,
-       avg(r.gap_ratio) as avg_gap_ratio
-ORDER BY avg_gap_ratio DESC
-LIMIT 10
-```
-**Key finding:** Nuclear Medicine (0.961) and Hematology-Oncology (0.954) top results — consistent with MongoDB findings.
-
----
-
-### Query 3 — Geographic Clusters (3 hops)
-```cypher
-MATCH (p:Provider)-[:LOCATED_IN_CITY]->(c:City)-[:IN_STATE]->(s:State)
-WHERE p.gap_ratio > 0.95
-RETURN s.abbr as state,
-       c.name as city,
-       count(p) as anomalous_providers,
-       avg(p.gap_ratio) as avg_gap_ratio
-ORDER BY anomalous_providers DESC
-LIMIT 10
-```
-**Key finding:** Houston TX (9 providers) and New York NY (8 providers) — geographic hotspots.
-
----
-
-### Query 4 — Specialty + Location Clusters (4 hops)
-```cypher
-MATCH (p1:Provider)-[:HAS_TYPE]->(pt:ProviderType)<-[:HAS_TYPE]-(p2:Provider)
-MATCH (p1)-[:LOCATED_IN_CITY]->(c:City)-[:IN_STATE]->(s:State)
-WHERE p1.gap_ratio > 0.95
-AND p2.gap_ratio > 0.95
-AND p1.npi <> p2.npi
-RETURN pt.name as specialty,
-       c.name as city,
-       s.abbr as state,
-       count(DISTINCT p1) as anomalous_providers,
-       avg(p1.gap_ratio) as avg_gap
-ORDER BY anomalous_providers DESC
-LIMIT 10
-```
-**Key finding:** CRNA clusters in Greenville SC, Detroit MI, Cincinnati OH, Erie PA — systemic nationwide pattern.
-
----
-
-### Query 5 — Provider Similarity Network (5 hops)
-```cypher
-MATCH (p1:Provider)-[:HAS_TYPE]->(pt:ProviderType)<-[:HAS_TYPE]-(p2:Provider)
-MATCH (p1)-[:LOCATED_IN_STATE]->(s:State)<-[:LOCATED_IN_STATE]-(p2)
-MATCH (p1)-[:PERFORMS]->(svc:Service)<-[:PERFORMS]-(p2)
-WHERE p1.npi < p2.npi
-AND p1.gap_ratio > 0.9
-AND p2.gap_ratio > 0.9
-RETURN p1.last_name as provider1,
-       p2.last_name as provider2,
-       pt.name as specialty,
-       s.abbr as state,
-       count(svc) as shared_services,
-       avg(p1.gap_ratio + p2.gap_ratio)/2 as avg_gap
-ORDER BY shared_services DESC
-LIMIT 10
-```
-**Key finding:** Blunck + Backlas (Diagnostic Radiology, TX) share 27 common high-gap services — network discovery impossible in MongoDB without complex application logic.
+Cypher queries are available in 02_CypherQueries
 
 ---
 

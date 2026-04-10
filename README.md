@@ -1,8 +1,8 @@
 # Medicare Provider Billing Anomaly Detection
 ## Using MongoDB Atlas, Neo4j Aura, and Claude Code with MCP
 
-## DAT 226 — NoSQL and Data Warehousing | SJSU | April 2026
-## Group project: Saranya Vaitheeswaran, Ani Taraiya, Kavya Ayappan, Rohini Ramasheshu
+#### DAT 226 — NoSQL and Data Warehousing | SJSU | April 2026
+#### Group project: Saranya Vaitheeswaran, Ani Taraiya, Kavya Ayappan, Rohini Ramasheshu
 
 ---
 

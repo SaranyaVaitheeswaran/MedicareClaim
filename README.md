@@ -404,7 +404,7 @@ claude --mcp-config claude_mcp_config.json
 
 | Tool | Used For | Result |
 |------|----------|--------|
-| Claude Code + MCP | All 5 MongoDB queries + 5 Neo4j queries | Best — parallel execution, best practices, caught data quality issues |
+| Claude Code + MCP | 5 MongoDB queries + 5 Neo4j queries | Best — parallel execution, best practices, caught data quality issues |
 | MongoDB Atlas AI | Query generation + charts | Mixed — failed on complex queries, worked with structured prompts |
 | ChatGPT | Neo4j graph model design | Good — reasonable structure, needed manual refinement |
 | Neo4j Generate with AI | Graph model from CSV | Poor — created single flat node |
